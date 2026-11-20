@@ -1,38 +1,41 @@
-from openai import OpenAI
+import requests
 
-client = OpenAI(
-    base_url="http://10.11.0.174:1234/v1",
-    api_key="lm-studio",
-    timeout=60,  # segundos máximos de espera por petición
-)
-
+URL = "http://10.11.0.174:1234/api/v1/chat"
 MODELO = "qwen/qwen3.5-9b"
 SISTEMA = (
     "Eres un diccionario. Respondes siempre en español, con una sola frase "
     "de máximo 30 palabras, sin introducciones ni listas."
 )
 
+
+def definir(palabra):
+    cuerpo = {
+        "model": MODELO,
+        "input": SISTEMA + "\n\nDefine la palabra: " + palabra,
+        "reasoning": "off",
+        "max_output_tokens": 150,
+        "temperature": 0.7,
+    }
+    r = requests.post(URL, json=cuerpo, timeout=60)
+    r.raise_for_status()
+    datos = r.json()
+    partes = [
+        str(item.get("content", ""))
+        for item in datos.get("output", [])
+        if item.get("type") == "message"
+    ]
+    texto = " ".join(partes).strip()
+    if not texto:
+        return "(sin respuesta) " + str(datos)[:300]
+    return texto
+
+
 frase = input("Escribe una frase: ")
-listaPalabras = frase.split()  # split() ignora los espacios dobles
 listaDefiniciones = []
 
-for palabra in listaPalabras:
+for palabra in frase.split():
     try:
-        respuesta = client.chat.completions.create(
-            model=MODELO,
-            messages=[
-                {"role": "system", "content": SISTEMA},
-                {"role": "user", "content": "Define la palabra: " + palabra},
-            ],
-            max_tokens=300,
-            temperature=0.7,
-            top_p=0.8,
-            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-        )
-        texto = respuesta.choices[0].message.content or "(sin respuesta)"
-        if respuesta.choices[0].finish_reason == "length":
-            texto += " [cortada por el límite de tokens]"
-        listaDefiniciones.append(palabra + ": " + texto)
+        listaDefiniciones.append(palabra + ": " + definir(palabra))
     except Exception as e:
         listaDefiniciones.append(palabra + ": ERROR - " + str(e))
 
