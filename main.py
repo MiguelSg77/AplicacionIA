@@ -24,7 +24,7 @@ for palabra in listaPalabras:
                 {"role": "system", "content": SISTEMA},
                 {"role": "user", "content": "Define la palabra: " + palabra},
             ],
-            max_tokens=150,
+            max_tokens=300,
             temperature=0.7,
             top_p=0.8,
             extra_body={"chat_template_kwargs": {"enable_thinking": False}},
