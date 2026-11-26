@@ -1,22 +1,24 @@
+import time
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://10.11.0.174:1234/v1",
     api_key="lm-studio",
-    timeout=60,  # segundos máximos de espera por petición
+    timeout=120,  # el razonamiento puede alargar la espera
 )
 
-MODELO = "qwen/qwen3.5-9b"
+MODELO = "qwen/qwen3.5-4b"
 SISTEMA = (
     "Eres un diccionario. Respondes siempre en español, con una sola frase "
     "de máximo 30 palabras, sin introducciones ni listas."
 )
 
 frase = input("Escribe una frase: ")
-listaPalabras = frase.split()  # split() ignora los espacios dobles
+listaPalabras = frase.split()
 listaDefiniciones = []
 
 for palabra in listaPalabras:
+    inicio = time.time()
     try:
         respuesta = client.chat.completions.create(
             model=MODELO,
@@ -24,17 +26,18 @@ for palabra in listaPalabras:
                 {"role": "system", "content": SISTEMA},
                 {"role": "user", "content": "Define la palabra: " + palabra},
             ],
-            max_tokens=300,
+            max_tokens=1500,  # margen para razonar Y responder, pero con tope
             temperature=0.7,
             top_p=0.8,
-            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         )
-        texto = respuesta.choices[0].message.content or "(sin respuesta)"
-        if respuesta.choices[0].finish_reason == "length":
-            texto += " [cortada por el límite de tokens]"
-        listaDefiniciones.append(palabra + ": " + texto)
+        eleccion = respuesta.choices[0]
+        texto = (eleccion.message.content or "").strip()
+        if not texto:
+            texto = "(sin respuesta: se agotó el límite de tokens razonando)"
+        segundos = time.time() - inicio
+        listaDefiniciones.append(f"{palabra}: {texto}  [{segundos:.1f} s]")
     except Exception as e:
-        listaDefiniciones.append(palabra + ": ERROR - " + str(e))
+        listaDefiniciones.append(f"{palabra}: ERROR - {e}")
 
 for definicion in listaDefiniciones:
     print(definicion)
